@@ -12,30 +12,31 @@ with open(file, mode) as file_object:
     if mode == 'r+':
         contacts = json.load(file_object)
     else:
-        contacts = {}
+        contacts = []
         file_object.write("[]")
+
 
 @app.route('/contacts', methods=['GET'])
 def get_contacts():
-    uuids = [ list(id.keys())[0] for id in contacts ]
-    print(uuids)
-    return jsonify({'contacts': contacts})
+    uuids = [ contact["id"] for contact in contacts ]
+    return jsonify({'contacts': uuids})
+
 
 @app.route('/contact/<id>/name', methods=['GET'])
 def get_contact_name(id):
-    for contact in contacts:
-        if id in contact:
-            return jsonify({'contact': contact[id]["name"]})
+    contacts_filtrated = list(filter(lambda contact: contact["id"] == id, contacts))
     
-    abort(400)
+    if len(contacts_filtrated) == 0: abort(400)
+    else: return jsonify({'contact': contacts_filtrated[0]["name"]})
+
 
 @app.route('/contact/<id>/full_info', methods=['GET'])
 def get_full_info(id):
-    for contact in contacts:
-        if id in contact:
-            return jsonify({'contact': contact[id]})
-    
-    abort(400)
+    contacts_filtrated = list(filter(lambda contact: contact["id"] == id, contacts))
+
+    if len(contacts_filtrated) == 0: abort(400)
+    else: return jsonify({'contact': contacts_filtrated[0]})
+
 
 @app.route('/create_contact', methods=['POST'])
 def add_contact():
@@ -43,24 +44,31 @@ def add_contact():
         abort(400)
 
     id = uuid.uuid4().__str__()
-    contacts.append({id: request.json})
+    contact = request.json
+    contact["id"] = id
+    contacts.append(contact)
+
     save_contacts()
     return jsonify({'contact': id}), 201
 
+
 @app.route('/contact/<id>/update', methods=['POST'])
 def update_contact(id):
-    if not request.json or 'field' not in request.json:
+    if not request.json:
         abort(400)
-    
-    print(contacts)
 
-    for contact in contacts:
-        if id in contact:
-            contact[id][request.json["field"]] = request.json["value"]
-            save_contacts()
-            return jsonify({'contact': contact[id]}), 201
+    contacts_filtrated = list(filter(lambda contact: contact["id"] == id, contacts))
 
-    abort(400)
+    if len(contacts_filtrated) == 0: abort(400)
+    else:
+        contacts.remove(contacts_filtrated[0])
+        contact = request.json
+        contact["id"] = id
+        contacts.append(contact)
+
+        save_contacts()
+        return jsonify({'contact': contact})
+
 
 def save_contacts():
     with open(file, 'w') as file_object:
